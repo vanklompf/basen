@@ -1,0 +1,11 @@
+services:
+  basen-monitor:
+    build: .
+    container_name: basen-monitor
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./instance:/app/instance
+    environment:
+      - FLASK_ENV=production
+    restart: unless-stopped

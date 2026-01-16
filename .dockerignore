@@ -1,0 +1,13 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+instance/database.db
+.env
+.venv
+env/
+venv/
+.git
+.gitignore
+README.md
