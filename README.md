@@ -23,9 +23,10 @@ The application will be available at `http://localhost:5000`
 ### Using Docker
 
 ```bash
-docker build -t basen-monitor .
+docker build -t basen-monitor --build-arg UID=$(id -u) --build-arg GID=$(id -g) .
 docker run -d -p 5000:5000 -v $(pwd)/instance:/app/instance basen-monitor
 ```
+
 
 ## API Endpoints
 
@@ -40,6 +41,10 @@ The scraper fetches data from:
 `http://www.mosir-lancut.pl/asp/pl_start.asp?typ=14&menu=135&strona=1`
 
 The fetch interval is configurable via the `POLLING_INTERVAL_MINUTES` environment variable (default: 5 minutes).
+
+### User/Group ID Configuration
+
+Configure UID/GID via `.env` file (Docker Compose) or `--build-arg` (Docker build). Defaults: UID=1000, GID=1000.
 
 
 ## Database

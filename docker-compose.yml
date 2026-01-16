@@ -1,6 +1,10 @@
 services:
   basen-monitor:
-    build: .
+    build:
+      context: .
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
     container_name: basen-monitor
     ports:
       - "5000:5000"
