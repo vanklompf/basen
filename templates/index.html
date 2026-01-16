@@ -103,6 +103,37 @@
             margin-top: 20px;
             font-size: 0.9em;
         }
+        
+        .time-range-selector {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .time-range-btn {
+            padding: 10px 20px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .time-range-btn:hover {
+            background: #f0f0f0;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.2);
+        }
+        
+        .time-range-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+        }
     </style>
 </head>
 <body>
@@ -125,6 +156,11 @@
             </div>
         </div>
         
+        <div class="time-range-selector">
+            <button class="time-range-btn active" data-hours="168" id="btn-week">Last Week</button>
+            <button class="time-range-btn" data-hours="720" id="btn-month">Last Month</button>
+        </div>
+        
         <div class="chart-container">
             <canvas id="occupancyChart"></canvas>
         </div>
@@ -136,6 +172,7 @@
     <script>
         let chart;
         let updateInterval;
+        let currentHours = 168; // Default to last week
 
         // Initialize chart
         const ctx = document.getElementById('occupancyChart').getContext('2d');
@@ -270,7 +307,7 @@
         async function fetchData() {
             try {
                 updateStatus('Fetching data...', 'loading');
-                const response = await fetch('/api/data?hours=24');
+                const response = await fetch(`/api/data?hours=${currentHours}`);
                 const result = await response.json();
 
                 if (result.success) {
@@ -284,7 +321,24 @@
             }
         }
 
+        // Handle time range selection
+        function setupTimeRangeButtons() {
+            const buttons = document.querySelectorAll('.time-range-btn');
+            buttons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    // Update active state
+                    buttons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    
+                    // Update current hours and fetch new data
+                    currentHours = parseInt(btn.getAttribute('data-hours'));
+                    fetchData();
+                });
+            });
+        }
+
         // Initial load
+        setupTimeRangeButtons();
         fetchData();
 
         // Auto-refresh every 30 seconds
