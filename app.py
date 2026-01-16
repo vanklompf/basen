@@ -42,9 +42,19 @@ with app.app_context():
 scheduler = BackgroundScheduler(daemon=True)
 scheduler.start()
 
+# Define polling hours (6:00 - 22:00)
+POLLING_START_TIME = datetime.strptime('06:00', '%H:%M').time()
+POLLING_END_TIME = datetime.strptime('22:00', '%H:%M').time()
+
 
 def fetch_and_store_occupancy():
     """Background job to fetch and store pool occupancy data."""
+    # Check if current time is within polling hours (6:00 - 22:00)
+    current_time = datetime.now().time()
+    if current_time < POLLING_START_TIME or current_time > POLLING_END_TIME:
+        logger.debug(f"Skipping fetch outside polling hours (6:00-22:00). Current time: {current_time.strftime('%H:%M')}")
+        return
+    
     logger.info("Fetching pool occupancy data...")
     result = fetch_pool_occupancy()
     
@@ -93,9 +103,13 @@ scheduler.add_job(
     replace_existing=True
 )
 
-# Fetch initial data on startup
+# Fetch initial data on startup (only if within polling hours)
 with app.app_context():
-    fetch_and_store_occupancy()
+    current_time = datetime.now().time()
+    if current_time >= POLLING_START_TIME and current_time <= POLLING_END_TIME:
+        fetch_and_store_occupancy()
+    else:
+        logger.info(f"Skipping initial fetch outside polling hours (6:00-22:00). Current time: {current_time.strftime('%H:%M')}")
 
 # Shut down scheduler when app exits
 atexit.register(lambda: scheduler.shutdown())
