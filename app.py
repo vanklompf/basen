@@ -72,12 +72,24 @@ def fetch_and_store_occupancy():
         logger.warning("Failed to fetch occupancy data")
 
 
-# Schedule the job to run every 5 minutes
+# Get polling interval from environment variable, default to 5 minutes
+try:
+    polling_interval = int(os.getenv('POLLING_INTERVAL_MINUTES', '5'))
+    if polling_interval < 1:
+        logger.warning(f"Invalid polling interval {polling_interval}, using default of 5 minutes")
+        polling_interval = 5
+except (ValueError, TypeError):
+    logger.warning("Invalid POLLING_INTERVAL_MINUTES value, using default of 5 minutes")
+    polling_interval = 5
+
+logger.info(f"Polling interval set to {polling_interval} minutes")
+
+# Schedule the job to run at configured interval
 scheduler.add_job(
     func=fetch_and_store_occupancy,
-    trigger=IntervalTrigger(minutes=5),
+    trigger=IntervalTrigger(minutes=polling_interval),
     id='fetch_occupancy',
-    name='Fetch pool occupancy every 5 minutes',
+    name=f'Fetch pool occupancy every {polling_interval} minutes',
     replace_existing=True
 )
 

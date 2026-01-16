@@ -4,7 +4,7 @@ A dockerized web application that monitors and visualizes swimming pool occupanc
 
 ## Features
 
-- Automatically fetches pool occupancy data every 5 minutes
+- Automatically fetches pool occupancy data (configurable interval, default: 5 minutes)
 - Stores historical data in SQLite database
 - Web interface with real-time charts
 - RESTful API for data access
@@ -39,7 +39,8 @@ docker run -d -p 5000:5000 -v $(pwd)/instance:/app/instance basen-monitor
 The scraper fetches data from:
 `http://www.mosir-lancut.pl/asp/pl_start.asp?typ=14&menu=135&strona=1`
 
-The fetch interval is set to 5 minutes and can be modified in `app.py`.
+The fetch interval is configurable via the `POLLING_INTERVAL_MINUTES` environment variable (default: 5 minutes).
+
 
 ## Database
 

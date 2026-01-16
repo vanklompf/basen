@@ -8,4 +8,6 @@ services:
       - ./instance:/app/instance
     environment:
       - FLASK_ENV=production
+      # Polling interval in minutes (default: 5)
+      # - POLLING_INTERVAL_MINUTES=5
     restart: unless-stopped
