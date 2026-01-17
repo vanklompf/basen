@@ -1,8 +1,9 @@
 FROM python:3.11-slim
 
-# Build arguments for UID and GID
+# Build arguments for UID, GID, and VERSION
 ARG UID=1000
 ARG GID=1000
+ARG VERSION=v0.3
 
 WORKDIR /app
 
@@ -29,6 +30,9 @@ RUN mkdir -p instance && \
 
 # Change ownership of app directory
 RUN chown -R ${UID}:${GID} /app
+
+# Set version as environment variable
+ENV APP_VERSION=${VERSION}
 
 # Switch to non-root user
 USER appuser

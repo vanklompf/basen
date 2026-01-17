@@ -40,6 +40,17 @@
             font-size: 1.1em;
         }
         
+        .subtitle a {
+            color: #667eea;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+        
+        .subtitle a:hover {
+            color: #764ba2;
+            text-decoration: underline;
+        }
+        
         .stats {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -169,7 +180,7 @@
 <body>
     <div class="container">
         <h1>🏊 Pool Occupancy Monitor</h1>
-        <p class="subtitle">MOSIR Łańcut - Real-time swimming pool occupancy tracking</p>
+        <p class="subtitle"><a href="http://www.mosir-lancut.pl/" target="_blank" rel="noopener noreferrer">MOSIR Łańcut</a> - Real-time swimming pool occupancy tracking</p>
         
         <div class="stats">
             <div class="stat-card">
@@ -205,6 +216,7 @@
                 </svg>
                 View on GitHub
             </a>
+            <span style="opacity: 0.7; margin-left: 15px;">Version {{ version }}</span>
         </div>
     </div>
 

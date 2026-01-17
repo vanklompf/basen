@@ -121,7 +121,8 @@ atexit.register(lambda: scheduler.shutdown())
 @app.route('/')
 def index():
     """Main page with chart visualization."""
-    return render_template('index.html')
+    version = os.getenv('APP_VERSION', 'dev')
+    return render_template('index.html', version=version)
 
 
 @app.route('/api/data')
