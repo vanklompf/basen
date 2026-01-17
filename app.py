@@ -3,8 +3,9 @@ Flask application for monitoring swimming pool occupancy.
 """
 import logging
 import os
+import json
 from datetime import datetime, timedelta
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, has_app_context
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 import atexit
@@ -61,23 +62,25 @@ def fetch_and_store_occupancy():
     if result:
         current_count, max_capacity = result
         
-        # Check if we already have a recent reading (within last 4 minutes)
-        # to avoid duplicate entries
-        recent = db.session.query(OccupancyData).filter(
-            OccupancyData.timestamp >= datetime.utcnow() - timedelta(minutes=4)
-        ).first()
-        
-        if not recent or recent.current_count != current_count or recent.max_capacity != max_capacity:
-            occupancy = OccupancyData(
-                current_count=current_count,
-                max_capacity=max_capacity
-            )
-            db.session.add(occupancy)
-            db.session.commit()
-            percentage = (current_count / max_capacity * 100) if max_capacity > 0 else 0
-            logger.info(f"Stored occupancy data: {current_count}/{max_capacity} ({percentage:.1f}%)")
-        else:
-            logger.info("Skipping duplicate reading")
+        # Use application context for database operations
+        with app.app_context():
+            # Check if we already have a recent reading (within last 4 minutes)
+            # to avoid duplicate entries
+            recent = db.session.query(OccupancyData).filter(
+                OccupancyData.timestamp >= datetime.utcnow() - timedelta(minutes=4)
+            ).first()
+            
+            if not recent or recent.current_count != current_count or recent.max_capacity != max_capacity:
+                occupancy = OccupancyData(
+                    current_count=current_count,
+                    max_capacity=max_capacity
+                )
+                db.session.add(occupancy)
+                db.session.commit()
+                percentage = (current_count / max_capacity * 100) if max_capacity > 0 else 0
+                logger.info(f"Stored occupancy data: {current_count}/{max_capacity} ({percentage:.1f}%)")
+            else:
+                logger.info("Skipping duplicate reading")
     else:
         logger.warning("Failed to fetch occupancy data")
 
