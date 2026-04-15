@@ -129,14 +129,55 @@ def index():
 def get_data():
     """API endpoint to get historical occupancy data."""
     try:
-        # Get data from last 24 hours by default
+        view = request.args.get('view')
+
+        if view in {'week', 'month'}:
+            offset = int(request.args.get('offset', 0))
+            now = datetime.utcnow()
+
+            if view == 'week':
+                # Monday is 0 in Python's weekday() index.
+                period_start = (now - timedelta(days=now.weekday())).replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
+                period_start = period_start + timedelta(weeks=offset)
+                period_end = period_start + timedelta(weeks=1)
+            else:
+                period_start = datetime(now.year, now.month, 1)
+                shifted_month = now.month + offset
+                shifted_year = now.year + ((shifted_month - 1) // 12)
+                shifted_month = ((shifted_month - 1) % 12) + 1
+                period_start = datetime(shifted_year, shifted_month, 1)
+
+                if shifted_month == 12:
+                    period_end = datetime(shifted_year + 1, 1, 1)
+                else:
+                    period_end = datetime(shifted_year, shifted_month + 1, 1)
+
+            data = db.session.query(OccupancyData).filter(
+                OccupancyData.timestamp >= period_start,
+                OccupancyData.timestamp < period_end
+            ).order_by(OccupancyData.timestamp.asc()).all()
+
+            return jsonify({
+                'success': True,
+                'data': [record.to_dict() for record in data],
+                'meta': {
+                    'view': view,
+                    'offset': offset,
+                    'period_start': period_start.isoformat(),
+                    'period_end': period_end.isoformat()
+                }
+            })
+
+        # Backward-compatible fallback: last N hours.
         hours = int(request.args.get('hours', 24))
         since = datetime.utcnow() - timedelta(hours=hours)
-        
+
         data = db.session.query(OccupancyData).filter(
             OccupancyData.timestamp >= since
         ).order_by(OccupancyData.timestamp.asc()).all()
-        
+
         return jsonify({
             'success': True,
             'data': [record.to_dict() for record in data]

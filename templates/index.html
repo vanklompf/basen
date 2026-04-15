@@ -120,6 +120,7 @@
             justify-content: center;
             gap: 10px;
             margin-bottom: 20px;
+            flex-wrap: wrap;
         }
         
         .time-range-btn {
@@ -144,6 +145,44 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border-color: transparent;
+        }
+
+        .pagination-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            padding: 8px 16px;
+            border: 2px solid #764ba2;
+            background: white;
+            color: #764ba2;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .nav-btn:hover {
+            background: #f4f1fa;
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #f7f7f7;
+        }
+
+        .period-label {
+            min-width: 250px;
+            text-align: center;
+            font-weight: 600;
+            color: #333;
         }
         
         .footer {
@@ -198,8 +237,15 @@
         </div>
         
         <div class="time-range-selector">
-            <button class="time-range-btn active" data-hours="168" id="btn-week">Last Week</button>
-            <button class="time-range-btn" data-hours="720" id="btn-month">Last Month</button>
+            <button class="time-range-btn active" data-view="week" id="btn-week">Week View</button>
+            <button class="time-range-btn" data-view="month" id="btn-month">Month View</button>
+        </div>
+
+        <div class="pagination-controls">
+            <button class="nav-btn" id="btn-prev">◀ Previous</button>
+            <div class="period-label" id="periodLabel">This Week</div>
+            <button class="nav-btn" id="btn-this-week">This Week</button>
+            <button class="nav-btn" id="btn-next">Next ▶</button>
         </div>
         
         <div class="chart-container">
@@ -223,7 +269,8 @@
     <script>
         let chart;
         let updateInterval;
-        let currentHours = 168; // Default to last week
+        let currentView = 'week';
+        let currentOffset = 0;
 
         // Initialize chart
         const ctx = document.getElementById('occupancyChart').getContext('2d');
@@ -327,9 +374,76 @@
             });
         }
 
+        function formatDateOnly(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+
+        function updatePeriodLabel(meta) {
+            const label = document.getElementById('periodLabel');
+            if (!meta || !meta.period_start || !meta.period_end) {
+                label.textContent = currentView === 'week' ? 'Week View' : 'Month View';
+                return;
+            }
+
+            const startDate = new Date(meta.period_start);
+            const endDate = new Date(meta.period_end);
+            endDate.setDate(endDate.getDate() - 1);
+
+            if (meta.view === 'month') {
+                label.textContent = startDate.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long'
+                });
+            } else {
+                label.textContent = `${formatDateOnly(startDate)} - ${formatDateOnly(endDate)}`;
+            }
+        }
+
+        function updatePaginationState() {
+            const nextBtn = document.getElementById('btn-next');
+            const thisWeekBtn = document.getElementById('btn-this-week');
+            nextBtn.disabled = currentOffset === 0;
+            thisWeekBtn.disabled = currentView === 'week' && currentOffset === 0;
+        }
+
+        function writeUrlState() {
+            const params = new URLSearchParams(window.location.search);
+            params.set('view', currentView);
+            params.set('offset', String(currentOffset));
+            const newUrl = `${window.location.pathname}?${params.toString()}`;
+            window.history.replaceState({}, '', newUrl);
+        }
+
+        function readUrlState() {
+            const params = new URLSearchParams(window.location.search);
+            const view = params.get('view');
+            const parsedOffset = parseInt(params.get('offset'), 10);
+
+            if (view === 'week' || view === 'month') {
+                currentView = view;
+            }
+
+            if (!Number.isNaN(parsedOffset)) {
+                currentOffset = parsedOffset;
+            }
+        }
+
         function updateChart(data) {
             if (!data || data.length === 0) {
-                updateStatus('No data available', 'error');
+                chart.data.labels = [];
+                chart.data.datasets[0].data = [];
+                chart.data.datasets[1].data = [];
+                chart.update('none');
+                document.getElementById('current').textContent = '-';
+                document.getElementById('max').textContent = '-';
+                document.getElementById('percentage').textContent = '-';
+                document.getElementById('lastUpdate').textContent = 'No readings in selected period';
+                updateStatus('No data available for selected period', 'error');
                 return;
             }
 
@@ -358,11 +472,14 @@
         async function fetchData() {
             try {
                 updateStatus('Fetching data...', 'loading');
-                const response = await fetch(`/api/data?hours=${currentHours}`);
+                const response = await fetch(`/api/data?view=${currentView}&offset=${currentOffset}`);
                 const result = await response.json();
 
                 if (result.success) {
                     updateChart(result.data);
+                    updatePeriodLabel(result.meta);
+                    updatePaginationState();
+                    writeUrlState();
                 } else {
                     updateStatus('Error: ' + (result.error || 'Unknown error'), 'error');
                 }
@@ -376,20 +493,66 @@
         function setupTimeRangeButtons() {
             const buttons = document.querySelectorAll('.time-range-btn');
             buttons.forEach(btn => {
+                const btnView = btn.getAttribute('data-view');
+                if (btnView === currentView) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+
                 btn.addEventListener('click', () => {
                     // Update active state
                     buttons.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     
-                    // Update current hours and fetch new data
-                    currentHours = parseInt(btn.getAttribute('data-hours'));
+                    // Switch mode and reset to current period.
+                    currentView = btn.getAttribute('data-view');
+                    currentOffset = 0;
                     fetchData();
                 });
             });
         }
 
+        function setupPaginationButtons() {
+            const prevBtn = document.getElementById('btn-prev');
+            const nextBtn = document.getElementById('btn-next');
+            const thisWeekBtn = document.getElementById('btn-this-week');
+
+            prevBtn.addEventListener('click', () => {
+                currentOffset -= 1;
+                fetchData();
+            });
+
+            nextBtn.addEventListener('click', () => {
+                if (currentOffset < 0) {
+                    currentOffset += 1;
+                    fetchData();
+                }
+            });
+
+            thisWeekBtn.addEventListener('click', () => {
+                currentView = 'week';
+                currentOffset = 0;
+
+                const buttons = document.querySelectorAll('.time-range-btn');
+                buttons.forEach(btn => {
+                    const btnView = btn.getAttribute('data-view');
+                    if (btnView === 'week') {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+
+                fetchData();
+            });
+        }
+
         // Initial load
+        readUrlState();
         setupTimeRangeButtons();
+        setupPaginationButtons();
+        updatePaginationState();
         fetchData();
 
         // Auto-refresh every 30 seconds
