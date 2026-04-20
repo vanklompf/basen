@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MOSIR Łańcut - Pool Occupancy Monitor</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -271,6 +272,8 @@
         let updateInterval;
         let currentView = 'week';
         let currentOffset = 0;
+        let currentPeriodStart = null;
+        let currentPeriodEnd = null;
 
         // Initialize chart
         const ctx = document.getElementById('occupancyChart').getContext('2d');
@@ -316,14 +319,26 @@
                 },
                 scales: {
                     x: {
+                        type: 'time',
                         display: true,
                         title: {
                             display: true,
                             text: 'Time'
                         },
+                        time: {
+                            tooltipFormat: 'MMM d, HH:mm',
+                            displayFormats: {
+                                hour: 'MMM d, HH:mm',
+                                day: 'MMM d',
+                                week: 'MMM d',
+                                month: 'MMM yyyy'
+                            }
+                        },
                         ticks: {
                             maxRotation: 45,
-                            minRotation: 45
+                            minRotation: 45,
+                            autoSkip: true,
+                            major: { enabled: true }
                         }
                     },
                     y: {
@@ -433,11 +448,25 @@
             }
         }
 
+        function applyPeriodBounds() {
+            // Anchor x-axis to the selected period so partial-week data does
+            // not stretch across the full chart width.
+            if (currentPeriodStart && currentPeriodEnd) {
+                chart.options.scales.x.min = currentPeriodStart.getTime();
+                chart.options.scales.x.max = currentPeriodEnd.getTime();
+                chart.options.scales.x.time.unit = currentView === 'month' ? 'day' : 'day';
+            } else {
+                delete chart.options.scales.x.min;
+                delete chart.options.scales.x.max;
+            }
+        }
+
         function updateChart(data) {
             if (!data || data.length === 0) {
                 chart.data.labels = [];
                 chart.data.datasets[0].data = [];
                 chart.data.datasets[1].data = [];
+                applyPeriodBounds();
                 chart.update('none');
                 document.getElementById('current').textContent = '-';
                 document.getElementById('max').textContent = '-';
@@ -447,14 +476,14 @@
                 return;
             }
 
-            const labels = data.map(d => formatTime(d.timestamp));
-            const percentages = data.map(d => d.percentage);
-            const counts = data.map(d => d.current_count);
+            const percentages = data.map(d => ({ x: new Date(d.timestamp).getTime(), y: d.percentage }));
+            const counts = data.map(d => ({ x: new Date(d.timestamp).getTime(), y: d.current_count }));
 
-            chart.data.labels = labels;
+            chart.data.labels = [];
             chart.data.datasets[0].data = percentages;
             chart.data.datasets[1].data = counts;
-            chart.update('none'); // 'none' for smooth updates
+            applyPeriodBounds();
+            chart.update('none');
 
             // Update stats with latest data
             const latest = data[data.length - 1];
@@ -476,6 +505,13 @@
                 const result = await response.json();
 
                 if (result.success) {
+                    if (result.meta && result.meta.period_start && result.meta.period_end) {
+                        currentPeriodStart = new Date(result.meta.period_start);
+                        currentPeriodEnd = new Date(result.meta.period_end);
+                    } else {
+                        currentPeriodStart = null;
+                        currentPeriodEnd = null;
+                    }
                     updateChart(result.data);
                     updatePeriodLabel(result.meta);
                     updatePaginationState();
